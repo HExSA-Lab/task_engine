@@ -1,37 +1,44 @@
-#ifndef PROPAGATE_H
-#define PROPAGATE_H
+#ifndef ERROR_H
+#define ERROR_H
 
 #include <stdio.h>
 #include <errno.h>
 
-// call should return true on success
-#define try(call)									\
-	int ret = (call);								\
-	/* if ret is not zero (success) (true) */		\
-	if(!ret) {										\
-		if (errno) {								\
-			perror("");								\
-		}											\
-		printf("%s returned %d\n", #call, ret);		\
-		return -1;									\
-	}
-/*
-@summary expects call to be zero (success) (true)
+#define try_true(call, error_val) {				\
+	int ret = (call);							\
+	if(!ret) {									\
+		if (errno) {							\
+			perror("");							\
+		}										\
+		printf("%s:%d: %s returned %d\n",		\
+			   __FILE__, __LINE__, #call, ret);	\
+		return error_val;						\
+	}											\
+}
 
-Otherwise, this will print an error message arnd return -1 from the
+/*
+@summary expects call to be true
+
+Otherwise, this will print an error message arnd return error_val from the
 caller's function.
 */
 
-#define try_nneg(call)							\
-	try((call) > 0)								\
+#define try_zero(call, error_val)				\
+	try_true(call == 0, error_val)
 /*
-@summary expects call to be non-negative
+@summary expects call to be zero. Returns error_val if it is.
+ */
+
+#define try_nneg(call, error_val)				\
+	try_true((call) > 0, error_val)
+/*
+@summary expects call to be non-negative. Returns error_val if it is.
 */
 
-#define try_nnull(call)							\
-	try((call) != NULL)							\
+#define try_nnull(call, error_val)				\
+	try_true((call) != NULL, error_val)
 /*
-@summary expects call to be non-null
+@summary expects call to be non-null. Returns error_val if it is.
 */
 
 #endif

@@ -8,14 +8,18 @@ int unittest_assert_(bool cond, char const* message, char const* file, size_t li
 		if(message == NULL) {
 			message = "";
 		}
-		try_nneg(printf("Unittest [%s] failed\n%s:%ld: %s\n", message, file, line, cond_str));
+		try_nneg(
+				 printf("Unittest [%s] failed\n%s:%ld: %s\n", message, file, line, cond_str),
+				 -1);
 		if(fmt) {
 			va_list vargs;
 			va_start(vargs, fmt);
-			try_nneg(printf(fmt, vargs));
+			try_nneg(
+					 vprintf(fmt, vargs),
+					 -1);
 			va_end(vargs);
 		}
-		printf("\n");
+		try_nneg(puts(""), -1);
 	}
 	return 0;
 }

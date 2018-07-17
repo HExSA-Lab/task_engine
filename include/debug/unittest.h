@@ -12,7 +12,7 @@
 	unittest_assert_(cond  , message, __FILE__, __LINE__, #cond, NULL);
 
 #define unittest_assert_eq(a, b, message)								\
-	unittest_assert_(a == b, message, __FILE__, __LINE__, #a " == " #b, "%s != %s", #a, #b);
+	unittest_assert_(a == b, message, __FILE__, __LINE__, #a " == " #b, "fasle: %s == %s", #a, #b);
 
 int unittest_assert_(bool cond, char const* message, char const* file, size_t line, char const* cond_str, char const* fmt, ...);
 /*

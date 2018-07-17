@@ -9,30 +9,35 @@
 ### directory layout ###
 BUILD_DIR = build
 SRC_DIR   = src
-INC_DIR   = include
+INC_DIR   = ./include
 
 ### variables containing lists of files ###
-SRCS      := $(shell find $(SRC_DIR) -name *.c)
-MAIN_SRCS := $(filter %.main.c,$(SRCS))
-OBJS      := $(SRCS:%.c=$(BUILD_DIR)/%.o)
-OBJS_DBG  := $(SRCS:%.c=$(BUILD_DIR)/%.odbg)
-MAIN_OBJS := $(MAIN_SRCS:%.c=$(BUILD_DIR)/%.o)
-MAIN_OBJS_DBG := $(MAIN_SRCS:%.c=$(BUILD_DIR)/%.odbg)
-MAIN_EXES := $(MAIN_OBJS:.main.o=.out)
-MAIN_EXES_DBG := $(MAIN_OBJS_DBG:.main.odbg=.outdbg)
+# reactants
+C_SRCS    := $(shell find $(SRC_DIR) -name *.c -printf '%P\n')
+CC_SRCS  := $(shell find $(SRC_DIR) -name *.cc -printf '%P\n')
+MAIN_C_SRCS := $(filter %.main.c,$(C_SRCS))
+MAIN_CC_SRCS := $(filter %.main.cc,$(CC_SRCS))
+
+# products
+OBJS      := $(C_SRCS:%.c=$(BUILD_DIR)/%.o)      $(CC_SRCS:%.cc=$(BUILD_DIR)/%.o)
 DEPS      := $(OBJS:.o=.d)
+MAIN_OBJS := $(MAIN_C_SRCS:%.c=$(BUILD_DIR)/%.o) $(MAIN_CC_SRCS:%.cc=$(BUILD_DIR)/%.o)
+OTHER_OBJS := $(filter-out $(MAIN_OBJS),$(OBJS))
+MAIN_EXES := $(MAIN_OBJS:.main.o=.out)
 
 ### commandline flags/vairbales ###
 MKDIR_P   ?= mkdir -p
-CC        ?= clang
+CC        := clang
+CPP       := clang++
 INC_FLAGS := -I$(INC_DIR)
-WFLAGS    := -Wall -Wextra
+WFLAGS    := -Wall -Wextra -Wno-unused-parameter
 CFLAGS    := $(INC_FLAGS) $(WFLAGS)
+CPPFLAGS  := $(INC_FLAGS) $(WFLAGS) -std=c++11
 DBG_FLAGS := -Og -g
-OPT_FLAGS := -Ofast -DNDEBUG
+OPT_FLAGS := -O2 -DNDEBUG
 
 ### compile executables ###
-all: $(MAIN_EXES) $(MAIN_EXES_DBG)
+all: $(MAIN_EXES) $(addsuffix dbg,$(MAIN_EXES))
 
 distclean:
 	$(RM) -r $(BUILD_DIR)
@@ -44,47 +49,56 @@ clean:
 	make depends
 .PHONY: clean
 
-$(BUILD_DIR)/%.out: $(BUILD_DIR)/%.main.o $(filter-out $(MAIN_OBJS),$(OBJS))
-	$(CC) $^ -o $@ $(LDFLAGS)
+$(BUILD_DIR)/%.out: $(BUILD_DIR)/%.main.o $(OTHER_OBJS)
+	$(CPP) $^ -o $@ $(CPPFLAGS)
 
 # same executables, but linked with debug objects
-$(BUILD_DIR)/%.outdbg: $(BUILD_DIR)/%.main.odbg $(filter-out $(MAIN_OBJS_DBG),$(OBJS_DBG))
-	$(CC) $^ -o $@ $(LDFLAGS)
+$(BUILD_DIR)/%.outdbg: $(BUILD_DIR)/%.main.odbg $(addsuffix dbg,$(OTHER_OBJS))
+	$(CPP) $^ -o $@ $(CPPFLAGS)
 
 ### compile object files ###
-# $(OBJS)
-$(BUILD_DIR)/%.o: %.c
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) $(OPT_FLAGS) -c $< -o $@
 
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cc
+	$(CPP) $(CPPFLAGS) $(OPT_FLAGS) -c $< -o $@
+
 # same objects, but compiled with debug flags
-# $(OBJS_DBG)
-$(BUILD_DIR)/%.odbg: %.c
+$(BUILD_DIR)/%.odbg: $(SRC_DIR)/%.c
 	$(CC) $(CFLAGS) $(DBG_FLAGS) -c $< -o $@
+
+$(BUILD_DIR)/%.odbg: $(SRC_DIR)/%.cc
+	$(CPP) $(CPPFLAGS) $(DBG_FLAGS) -c $< -o $@
 
 ### generates Makefile rules which add dependencies from #include's ##
 # $(DEPS)
-$(BUILD_DIR)/%.d: %.c
+$(BUILD_DIR)/%.d: $(SRC_DIR)/%.c
 	$(MKDIR_P) $(dir $@)
-	$(CC) $(INC_FLAGS) -MM -MF $@ -MT $(BUILD_DIR)/$(<:.c=.o) $<
+	$(CC) $(CFLAGS) -MM -MF $@ -MT $(BUILD_DIR)/$(<:.c=.o) $<
+$(BUILD_DIR)/%.d: $(SRC_DIR)/%.cc
+	$(MKDIR_P) $(dir $@)
+	$(CPP) $(CPPFLAGS) -MM -MF $@ -MT $(BUILD_DIR)/$(<:.c=.o) $<
+
 depends: $(DEPS)
 
 -include $(DEPS)
 
 ### project specific targets ###
 
-TEST_EXE := $(BUILD_DIR)/src/task_engine/test.outdbg
-EXPERIMENT_EXE := $(BUILD_DIR)/src/task_engine/experiment.out
+# TEST_EXE := $(BUILD_DIR)/src/task_engine/test.outdbg
+# EXPERIMENT_EXE := $(BUILD_DIR)/src/task_engine/experiment.out
 
-run: $(EXPERIMENT_EXE)
-	./$(EXPERIMENT_EXE)
+# run: $(EXPERIMENT_EXE)
+# 	./$(EXPERIMENT_EXE)
 
-debug: $(TEST_EXE)
-	MALLOC_CHECK_=1 gdb -q -ex run "$(TEST_EXE)" -ex backtrace
-.PHONY: debug
+# debug: $(TEST_EXE)
+# 	gdb "$(TEST_EXE)" -q -ex run -ex backtrace
+# .PHONY: debug
 
-test: $(TEST_EXE)
-	valgrind $(TEST_EXE)
-.PHONY: test
+# test: $(TEST_EXE)
+# 	valgrind -q $(TEST_EXE)
+# #  --track-origins=yes --leak-check=full
+# .PHONY: test
 
 ### references ###
 # see https://spin.atomicobject.com/2016/08/26/makefile-c-projects/
